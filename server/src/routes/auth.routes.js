@@ -1,8 +1,7 @@
+import { registerUser, loginUser } from '../controllers/auth.controllers.js';
 
-const { registerUser, loginUser } = require('../controllers/auth.controllers');
 
-
-module.exports = (app) => {
+export default (app) => {
     app.post('/api/v1/auth/register', registerUser);
     app.post('/api/v1/auth/login', loginUser);
     }

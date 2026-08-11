@@ -1,9 +1,8 @@
-const User = require('../models/user.models');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+import user_model from '../models/user.models.js';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
-
-exports.registerUser = async (req, res) => {
+export async function registerUser(req, res) {
 
     const { username, email, password , phone } = req.body;
     try{
@@ -11,7 +10,7 @@ exports.registerUser = async (req, res) => {
             return res.status(400).json({message:"All fields are required"});
         }
 
-        const existingUser = await User.findOne({ $or: [{ email }, { username }, { phone }] });
+        const existingUser = await user_model.findOne({ $or: [{ email }, { username }, { phone }] });
         if (existingUser) {
             return res.status(400).json({ message: "User with this email, username or phone already exists" });
         }
@@ -32,7 +31,7 @@ exports.registerUser = async (req, res) => {
             phone: phone
         };
 
-      const user =  await User.create(newUser);
+      const user =  await user_model.create(newUser);
       return res.status(201).json({ message: "User registered successfully", user });
 
     } catch (error) {
@@ -42,17 +41,17 @@ exports.registerUser = async (req, res) => {
 }
 
 
-exports.loginUser = async (req, res) => {
+export async function loginUser(req, res) {
     const { phone, password } = req.body;
     try{
 
-        const user = await User.findOne({ phone: phone });
+        const user = await user_model.findOne({ phone: phone });
 
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const ispasswordValid = await bcrypt.compareSync(password, user.password);
+        const ispasswordValid = bcrypt.compareSync(password, user.password);
         if (!ispasswordValid) {
             return res.status(401).json({ message: "Invalid password" });
         }

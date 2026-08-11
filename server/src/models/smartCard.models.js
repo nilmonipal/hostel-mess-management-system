@@ -1,9 +1,9 @@
-const mongoose = require("mongoose");
+import { Schema } from "mongoose";
 
 
-const smartCardSchema = new mongoose.Schema({
+const smartCardSchema = new Schema({
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: "User",
         required: true,
     },

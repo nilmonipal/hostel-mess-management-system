@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import { Schema } from 'mongoose';
 
 //QRVerification
 // {
@@ -13,24 +13,24 @@ const mongoose = require('mongoose');
 //     verifiedAt
 // }
 
-const qrVerificationSchema = new mongoose.Schema({
+const qrVerificationSchema = new Schema({
     qrId: {
         type: String,
         required: true,
         unique: true
     },
     mealUsageId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'MealPrice_Timings',
         required: true
     },
     studentId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
     verifiedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
