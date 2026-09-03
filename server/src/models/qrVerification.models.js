@@ -1,17 +1,14 @@
-import { Schema } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 //QRVerification
-// {
-//     _id,
-//     qrId,
-//     mealUsageId,
-//     studentId,
-//     verifiedBy,      // Admin
-//     status,          // accepted / rejected
-//     rejectionReason,
-//     scannedAt,
-//     verifiedAt
-// }
+// qrId
+// mealUsageId
+// studentId
+// verifiedBy
+// status
+// rejectionReason
+// verifiedAt
+// timestamps (createdAt, updatedAt)
 
 const qrVerificationSchema = new Schema({
     qrId: {
@@ -21,12 +18,7 @@ const qrVerificationSchema = new Schema({
     },
     mealUsageId: {
         type: Schema.Types.ObjectId,
-        ref: 'MealPrice_Timings',
-        required: true
-    },
-    studentId: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Meal_Usage',
         required: true
     },
     verifiedBy: {
@@ -43,10 +35,6 @@ const qrVerificationSchema = new Schema({
         type: String,
         default: null
     },
-    scannedAt: {
-        type: Date,
-        default: Date.now
-    },
     verifiedAt: {
         type: Date,
         default: null
@@ -54,3 +42,7 @@ const qrVerificationSchema = new Schema({
 }, {
     timestamps: true
 });
+
+const qrVerification = mongoose.model("qrVerification", qrVerificationSchema)
+
+export default qrVerification;

@@ -7,11 +7,9 @@ const paymentSchema=new Schema({
         required:true,
     },
 
-    transactionId: {
-    type: String,
-    required: true,
-    unique: true // Ensures no duplicate payments are processed
-    },
+    startDate: Date,
+    endDate: Date,
+    
 
     mealType: {
     type: String,
@@ -21,13 +19,16 @@ const paymentSchema=new Schema({
     
     numberOfMeals: { type: Number, required: true ,default:0},
 
-    totalAmount: { type: Decimal128, required: true },
+    totalAmount: { type: Number, required: true },
 
-    status: { 
-    type: String, 
-    enum: ['pending', 'completed', 'failed'], 
+    status: {
+    type: String,
+    enum: ['pending', 'paid', 'completed', 'failed'],
     default: 'pending' 
     },
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
+    razorpaySignature: String,
     
     paymentDate: { type: Date, default: Date.now }
 },{
@@ -35,4 +36,5 @@ const paymentSchema=new Schema({
 });
 
 
-export const Payment = mongoose.model("Payment", paymentSchema);
+const Payment = mongoose.model("Payment", paymentSchema);
+export default Payment;

@@ -9,7 +9,10 @@ import user_model from './src/models/user.models.js';
 import { hashSync } from 'bcrypt';
 import authRoutes from './src/routes/auth.routes.js';
 import mealPriceAndTimeRoutes from './src/routes/mealPrice.routes.js';
-
+import orderRoutes from "./src/routes/order.routes.js"
+import mealUsageRoutes from "./src/routes/mealUsage.routes.js";
+import qrRoutes from './src/routes/qr.routes.js';
+import qrVerifyRoutes from "./src/routes/qrVerification.routes.js"
 const app = express();
 
 // Middleware
@@ -56,7 +59,10 @@ async function init() {
 // stitching the routes
 authRoutes(app);
 mealPriceAndTimeRoutes(app);
-
+orderRoutes(app);
+mealUsageRoutes(app);
+qrRoutes(app);
+qrVerifyRoutes(app);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

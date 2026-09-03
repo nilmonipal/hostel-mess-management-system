@@ -1,4 +1,4 @@
-import mealPriceService from "../services/mealPrice_time.services.js";
+import mealPriceService from "../services/mealPrice_time.service.js";
 
 // Add Meal Price and Time
 export async function addMealPriceAndTime(req, res) {
