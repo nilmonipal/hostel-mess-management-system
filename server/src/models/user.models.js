@@ -11,6 +11,16 @@ username:{
         trim :true,
         index:true
     },
+name: {
+    type: String,
+    trim: true,
+    default: ""
+},
+studentId: {
+    type: String,
+    trim: true,
+    default: ""
+},
 phone:{
     type:String,
     required:true,
@@ -31,8 +41,8 @@ password :{
     },
 role: {
     type: String,
-    enum: ['user', 'admin'], // Restricts the value to one of these strings
-    default: 'user', // Sets 'user' as the default role if not specified
+    enum: ['user', 'student', 'admin'],
+    default: 'user',
     required: true
   },
 refreshToken :{
