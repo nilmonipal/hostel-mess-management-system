@@ -14,6 +14,7 @@ import mealUsageRoutes from "./src/routes/mealUsage.routes.js";
 import qrRoutes from './src/routes/qr.routes.js';
 import qrVerifyRoutes from "./src/routes/qrVerification.routes.js";
 import adminDashboardRoutes from "./src/routes/adminDashboard.routes.js";
+import mealExtensionRoutes from "./src/routes/mealExtension.routes.js";
 const app = express();
 
 // Middleware
@@ -65,6 +66,7 @@ mealUsageRoutes(app);
 qrRoutes(app);
 qrVerifyRoutes(app);
 adminDashboardRoutes(app);
+mealExtensionRoutes(app);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
