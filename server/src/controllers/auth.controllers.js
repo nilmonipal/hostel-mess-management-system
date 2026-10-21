@@ -26,9 +26,12 @@ export async function registerUser(req, res) {
         }
         const newUser = {
             username: username,
+            studentId:studentId,
             email: email,
             password: bcrypt.hashSync(password, 10), // Hash the password before saving
-            phone: phone
+            phone: phone,
+            course:course,
+            role:role
         };
 
       const user =  await user_model.create(newUser);

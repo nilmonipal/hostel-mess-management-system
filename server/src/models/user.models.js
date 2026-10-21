@@ -13,6 +13,13 @@ username:{
     },
 name: {
     type: String,
+    required:true,
+    trim: true,
+    default: ""
+},
+course:{
+    type: String,
+    required:true,
     trim: true,
     default: ""
 },
