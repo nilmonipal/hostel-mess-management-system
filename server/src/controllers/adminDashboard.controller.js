@@ -2,6 +2,7 @@ import Payment from "../models/payments.models.js";
 import user_model from "../models/user.models.js";
 import Meal_Usage from "../models/meal_Usage.models.js";
 import qrVerification from "../models/qrVerification.models.js";
+import MealExtension from "../models/mealExtension.models.js";
 import AdminDashboardService from "../services/adminDashboard.service.js";
 
 const getTodayOverviews = async (req, res) => {
@@ -84,12 +85,48 @@ const getDetailsofStudent = async (req, res) => {
     }
 };
 
+const getStudents = async (req, res) => {
+    try {
+        const result = await AdminDashboardService.getStudents(req.query, user_model, Payment);
+        return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+};
+
+const getTransactions = async (req, res) => {
+    try {
+        const result = await AdminDashboardService.getTransactions(req.query, Payment, user_model);
+        return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+};
+
+const getReports = async (req, res) => {
+    try {
+        const result = await AdminDashboardService.getReports(
+            req.query,
+            Payment,
+            Meal_Usage,
+            user_model,
+            MealExtension
+        );
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+};
+
 export {
     getTodayOverviews,
     getMealStatistics,
     getPaymentStatus,
     getRecentMealActivity,
     getDetailsofStudent,
+    getStudents,
+    getTransactions,
+    getReports,
 };
 
 export default {
@@ -98,6 +135,8 @@ export default {
     getPaymentStatus,
     getRecentMealActivity,
     getDetailsofStudent,
+    getStudents,
+    getTransactions,
+    getReports,
 };
-
 

@@ -54,6 +54,20 @@ const mealExtensionSchema = new Schema(
 			type: Date,
 			default: null,
 		},
+		reviewedBy: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+			default: null,
+		},
+		reviewedAt: {
+			type: Date,
+			default: null,
+		},
+		reviewNote: {
+			type: String,
+			trim: true,
+			default: null,
+		},
 	},
 	{
 		timestamps: true,

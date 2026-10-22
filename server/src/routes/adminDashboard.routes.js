@@ -4,6 +4,9 @@ import {
   getPaymentStatus,
   getRecentMealActivity,
   getDetailsofStudent,
+  getStudents,
+  getTransactions,
+  getReports,
 } from "../controllers/adminDashboard.controller.js";
 import { authenticateUser, isAdmin } from "../middlewares/auth.middlewares.js";
 
@@ -13,4 +16,7 @@ export default (app) => {
   app.get("/api/v1/admin/dashboard/payment-status", [authenticateUser, isAdmin], getPaymentStatus);
   app.get("/api/v1/admin/dashboard/recent-activity", [authenticateUser, isAdmin], getRecentMealActivity);
   app.get("/api/v1/admin/dashboard/search-student", [authenticateUser, isAdmin], getDetailsofStudent);
+  app.get("/api/v1/admin/students", [authenticateUser, isAdmin], getStudents);
+  app.get("/api/v1/admin/transactions", [authenticateUser, isAdmin], getTransactions);
+  app.get("/api/v1/admin/reports", [authenticateUser, isAdmin], getReports);
 };

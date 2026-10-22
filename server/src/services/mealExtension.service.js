@@ -26,6 +26,23 @@ const calculateNumberOfDays = (fromDate, toDate) => {
 };
 
 class MealExtensionService {
+  async getAllExtensions({ status = "pending" } = {}) {
+    const query = ["pending", "approved", "rejected"].includes(status) ? { status } : {};
+    return MealExtension.find(query)
+      .populate("userId", "name username studentId email phone")
+      .populate("paymentId", "mealType numberOfMeals totalAmount status startDate endDate")
+      .sort({ createdAt: -1 })
+      .limit(500);
+  }
+
+  async getUserExtensions(userId) {
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
+    return MealExtension.find({ userId }).sort({ createdAt: -1 });
+  }
+
   async requestExtension({ userId, paymentId, fromDate, toDate, reason } = {}) {
     if (!userId || !paymentId) {
       throw new Error("User ID and payment ID are required");
@@ -44,6 +61,9 @@ class MealExtensionService {
     if (payment.userId?.toString() !== userId.toString()) {
       throw new Error("Your paymentId and userId do not match");
     }
+    if (payment.status !== "paid") {
+      throw new Error("Extensions can only be requested for a paid meal plan");
+    }
 
     const normalizedFromDate = normalizeDate(fromDate, "fromDate");
     const normalizedToDate = normalizeDate(toDate, "toDate");
@@ -54,6 +74,7 @@ class MealExtensionService {
 
     const mealUsages = await Meal_Usage.find({
       userId,
+      paymentId,
       mealDate: {
         $gte: normalizedFromDate,
         $lte: normalizedToDate,
@@ -178,13 +199,47 @@ class MealExtensionService {
       }
     }
 
-    extension.status = "approved";
-    extension.approvedBy = adminId;
-    extension.approvedAt = new Date();
+    const reviewedAt = new Date();
+    const updatedExtension = await MealExtension.findOneAndUpdate(
+      { _id: extensionId, status: "pending" },
+      {
+        $set: {
+          status: "approved",
+          approvedBy: adminId,
+          approvedAt: reviewedAt,
+          reviewedBy: adminId,
+          reviewedAt,
+          reviewNote: null,
+        },
+      },
+      { new: true }
+    );
+    if (!updatedExtension) {
+      throw new Error("Meal extension request was already reviewed");
+    }
+    return updatedExtension;
+  }
 
-    await extension.save();
-
-    return extension;
+  async rejectExtension(extensionId, adminId, reviewNote = "") {
+    if (!extensionId || !adminId) {
+      throw new Error("Extension ID and admin ID are required");
+    }
+    const updatedExtension = await MealExtension.findOneAndUpdate(
+      { _id: extensionId, status: "pending" },
+      {
+        $set: {
+          status: "rejected",
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+          reviewNote: typeof reviewNote === "string" ? reviewNote.trim().slice(0, 500) : "",
+        },
+      },
+      { new: true }
+    );
+    if (!updatedExtension) {
+      throw new Error("Meal extension request was not found or already reviewed");
+    }
+    return updatedExtension;
   }
 }
 

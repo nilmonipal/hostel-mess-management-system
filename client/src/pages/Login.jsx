@@ -1,18 +1,17 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import FormInput from '../components/FormInput.jsx'
 import { api } from '../services/api.js'
 
 function Login() {
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const navigate = useNavigate()
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
-    setSuccess('')
     setIsSubmitting(true)
 
     try {
@@ -24,7 +23,9 @@ function Login() {
 
       window.localStorage.setItem('token', data.Token)
       window.localStorage.setItem('user', JSON.stringify(data.User))
-      setSuccess(`Signed in successfully. Welcome, ${data.User.username}.`)
+      navigate(data.User.role === 'admin' ? '/admin/dashboard' : '/student/dashboard', {
+        replace: true,
+      })
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ??
@@ -63,11 +64,6 @@ function Login() {
         {error && (
           <p aria-live="polite" className="text-sm text-red-700" role="alert">
             {error}
-          </p>
-        )}
-        {success && (
-          <p aria-live="polite" className="text-sm text-emerald-800" role="status">
-            {success}
           </p>
         )}
         <Button disabled={isSubmitting} type="submit">

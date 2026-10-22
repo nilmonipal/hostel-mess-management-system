@@ -5,7 +5,7 @@ import mealUsageService from "./mealUsage.service.js";
 import qrVerification from "../models/qrVerification.models.js";
 
 class QRVerificationSercice{
-    async verifyQR(token, adminId){
+    async verifyQR(token){
         if (!token) {
             throw new Error("QR token is required");
         }
@@ -17,7 +17,7 @@ class QRVerificationSercice{
 
         const qr = await Meal_QR.findOne({
             tokenHash
-        });
+        }).populate("userId", "name username studentId");
 
         if (!qr) {
             return {
@@ -59,12 +59,20 @@ class QRVerificationSercice{
             qrId: qr.qrId,
             mealUsageId: qr.mealUsageId,
             mealType: qr.mealType,
-            mealDate: qr.mealDate
+            mealDate: qr.mealDate,
+            expiresAt: qr.expiresAt,
+            student: qr.userId ? {
+                name: qr.userId.name || qr.userId.username,
+                studentId: qr.userId.studentId
+            } : null
         }; 
 
     }
 
     async acceptQR (qrId, adminId) {
+        if (!adminId) {
+            throw new Error("Admin ID is required");
+        }
 
         const qr = await Meal_QR.findOne({ qrId: qrId });
 
@@ -95,7 +103,18 @@ class QRVerificationSercice{
             }
         );
 
-        await Meal_QR.deleteOne({_id: qr._id});
+        if (!mealUsage) {
+            throw new Error("Meal is no longer eligible or has already been used");
+        }
+
+        await qrVerification.create({
+            qrId: qr.qrId,
+            mealUsageId: mealUsage._id,
+            verifiedBy: adminId,
+            status: "accepted",
+            verifiedAt: new Date()
+        });
+        await Meal_QR.deleteOne({ _id: qr._id });
         return {
             valid : true,
             message : "You can enjoy your meal",
@@ -103,15 +122,25 @@ class QRVerificationSercice{
         }
     }
 
-    async declineQR(qrId, adminId){
+    async declineQR(qrId, adminId, rejectionReason = "Declined by admin"){
+      if (!adminId) {
+        throw new Error("Admin ID is required");
+      }
+      const qr = await Meal_QR.findOne({ qrId });
+      if (!qr || qr.status !== "active" || qr.expiresAt <= new Date()) {
+        throw new Error("QR is invalid, expired, or no longer active");
+      }
       const result = await qrVerification.create({
-            qrId:qrId,
-            mealUsageId: null,
+            qrId: qr.qrId,
+            mealUsageId: qr.mealUsageId,
             verifiedBy: adminId,
-            status:"rejected",
-            rejectionReason:"Declined meal for a moment",
-            verifiedAt:new Date()
-        })
+            status: "rejected",
+            rejectionReason: typeof rejectionReason === "string" && rejectionReason.trim()
+                ? rejectionReason.trim().slice(0, 500)
+                : "Declined by admin",
+            verifiedAt: new Date()
+        });
+      await Meal_QR.deleteOne({ _id: qr._id });
         return{
             valid : true,
             data :result

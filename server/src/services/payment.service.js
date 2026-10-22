@@ -15,18 +15,27 @@ class PaymentService {
   async calculatePayment(data) {
     const { mealType, numberOfMeals } = data;
 
-    if (!mealType || !numberOfMeals) {
-      throw new Error("MealType and numberOfMeals are required");
+    const validMealTypes = ["breakfast", "lunch", "dinner", "fullday"];
+    const days = Number(numberOfMeals);
+    if (!validMealTypes.includes(mealType) || !Number.isInteger(days) || days < 1) {
+      throw new Error("A valid meal type and positive whole number of days are required");
     }
 
-    let totalAmount = 0;
-    const prices = await MealPrice_Timings.find({ mealType });
-
-    for (const item of prices) {
-      totalAmount += item.mealPrice * Number(numberOfMeals);
+    let prices;
+    if (mealType === "fullday") {
+      const fullDayPrices = await MealPrice_Timings.find({ mealType: "fullday" });
+      prices = fullDayPrices.length
+        ? fullDayPrices
+        : await MealPrice_Timings.find({ mealType: { $in: ["breakfast", "lunch", "dinner"] } });
+    } else {
+      prices = await MealPrice_Timings.find({ mealType });
     }
 
-    return totalAmount;
+    if (!prices.length) {
+      throw new Error("Meal pricing is not configured for the selected plan");
+    }
+
+    return prices.reduce((total, item) => total + Number(item.mealPrice) * days, 0);
   }
 
   async createPayment(data) {
@@ -34,10 +43,11 @@ class PaymentService {
 
     const totalAmount = await this.calculatePayment({ mealType, numberOfMeals });
 
+    const startDate = new Date();
     const payment = new Payment({
       userId,
-      startDate: Date.now(),
-      endDate: Date.now() + Number(numberOfMeals)* 24 * 60 * 60 * 1000,
+      startDate,
+      endDate: new Date(startDate.getTime() + (Number(numberOfMeals) - 1) * 24 * 60 * 60 * 1000),
       mealType,
       numberOfMeals,
       totalAmount,
@@ -52,8 +62,13 @@ class PaymentService {
       throw new Error("Payment is required");
     }
 
+    const amountInPaise = Math.round(Number(payment.totalAmount) * 100);
+    if (!Number.isSafeInteger(amountInPaise) || amountInPaise < 1) {
+      throw new Error("Payment amount must be a positive amount in INR");
+    }
+
     const options = {
-      amount: Number(payment.totalAmount) * 100,
+      amount: amountInPaise,
       currency: "INR",
       receipt: payment._id.toString()
     };
@@ -72,7 +87,8 @@ class PaymentService {
     razorpay_payment_id,
     razorpay_signature,
   },
-  paymentId
+  paymentId,
+  userId
 ) {
   if (
     !razorpay_order_id ||
@@ -89,9 +105,8 @@ class PaymentService {
     throw new Error("Payment not found");
   }
 
-  // Prevent duplicate verification
-  if (payment.status === "paid") {
-    throw new Error("Payment has already been verified");
+  if (!userId || payment.userId.toString() !== userId.toString()) {
+    throw new Error("Access denied");
   }
 
   //  Verify Razorpay order belongs to this payment
@@ -129,18 +144,21 @@ class PaymentService {
     );
   }
 
+  if (payment.status === "paid") {
+    if (payment.razorpayPaymentId !== razorpay_payment_id) {
+      throw new Error("Payment has already been verified with a different payment");
+    }
+    return payment;
+  }
+
+  await MealUsageService.generateMealUsages(payment);
+
   payment.razorpayPaymentId = razorpay_payment_id;
   payment.razorpaySignature = razorpay_signature;
   payment.status = "paid";
   payment.paidAt = new Date();
 
-  await payment.save();
-
-  await MealUsageService.generateMealUsages(
-    payment
-  );
-
-  return payment;
+  return payment.save();
 }
   async getPaymentHistory(userId) {
     if (!userId) {

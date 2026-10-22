@@ -1,5 +1,23 @@
 import MealExtensionService from "../services/mealExtension.service.js";
 
+export const getAllMealExtensionsController = async (req, res) => {
+	try {
+		const mealExtensions = await MealExtensionService.getAllExtensions(req.query);
+		return res.status(200).json({ success: true, mealExtensions });
+	} catch (error) {
+		return res.status(400).json({ success: false, message: error.message });
+	}
+};
+
+export const getUserMealExtensionsController = async (req, res) => {
+	try {
+		const mealExtensions = await MealExtensionService.getUserExtensions(req.user._id);
+		return res.status(200).json({ success: true, mealExtensions });
+	} catch (error) {
+		return res.status(400).json({ success: false, message: error.message });
+	}
+};
+
 export const requestMealExtensionController = async (req, res) => {
 	try {
 		const mealExtension = await MealExtensionService.requestExtension({
@@ -41,9 +59,23 @@ export const approveMealExtensionController = async (req, res) => {
 	}
 };
 
-export default {
-	requestMealExtensionController,
-	approveMealExtensionController,
+export const rejectMealExtensionController = async (req, res) => {
+	try {
+		const mealExtension = await MealExtensionService.rejectExtension(
+			req.params.extensionId,
+			req.user._id,
+			req.body?.reason
+		);
+		return res.status(200).json({ success: true, mealExtension });
+	} catch (error) {
+		return res.status(400).json({ success: false, message: error.message });
+	}
 };
 
-
+export default {
+	getAllMealExtensionsController,
+	getUserMealExtensionsController,
+	requestMealExtensionController,
+	approveMealExtensionController,
+	rejectMealExtensionController,
+};

@@ -60,32 +60,34 @@ class MealUsageService {
 
       for (const mealType of meals) {
         const mealUsageId = `${payment._id}-${dateKey(mealDate)}-${mealType}`;
-        //
-        const nextMealDate = new Date(mealDate);
-        nextMealDate.setUTCDate(nextMealDate.getUTCDate() + 1);
-        const usage = await MealUsage.findOneAndUpdate(
-          {
-            userId: payment.userId,
-            paymentId: payment._id,
-            mealDate: { $gte: mealDate, $lt: nextMealDate },
-            mealType,
-          },
-//
-          {
-            $set: {
-              mealUsageId,
-            },
-            $setOnInsert: {
-              userId: payment.userId,
+        const entitlementQuery = {
+          userId: payment.userId,
+          mealDate,
+          mealType,
+        };
+        let usage = await MealUsage.findOne(entitlementQuery);
+
+        if (!usage) {
+          try {
+            usage = await MealUsage.create({
+              ...entitlementQuery,
               paymentId: payment._id,
-              mealType,
-              mealDate,
+              mealUsageId,
               entitled: true,
               used: false,
-            },
-          },
-          { new: true, upsert: true, setDefaultsOnInsert: true }
-        );
+            });
+          } catch (error) {
+            if (error.code !== 11000) {
+              throw error;
+            }
+
+            usage = await MealUsage.findOne(entitlementQuery);
+            if (!usage) {
+              throw error;
+            }
+          }
+        }
+
         usages.push(usage);
       }
     }

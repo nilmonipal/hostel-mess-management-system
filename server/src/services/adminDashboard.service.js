@@ -1,5 +1,184 @@
 class AdminDashboardService {
+    async getStudents({ search = "", status = "", page = 1, limit = 10 }, User, Payment) {
+        const keyword = typeof search === "string" ? search.trim() : "";
+        const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
+        const safeLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 10));
+        const userQuery = { role: { $in: ["student", "user"] } };
 
+        if (keyword) {
+            const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            userQuery.$or = [
+                { studentId: { $regex: escapedKeyword, $options: "i" } },
+                { name: { $regex: escapedKeyword, $options: "i" } },
+                { email: { $regex: escapedKeyword, $options: "i" } },
+                { phone: { $regex: escapedKeyword, $options: "i" } },
+                { username: { $regex: escapedKeyword, $options: "i" } },
+            ];
+        }
+
+        const now = new Date();
+        if (status === "active" || status === "inactive") {
+            const activePayments = await Payment.distinct("userId", {
+                status: "paid",
+                startDate: { $lte: now },
+                endDate: { $gte: now },
+            });
+            userQuery._id = status === "active" ? { $in: activePayments } : { $nin: activePayments };
+        }
+
+        const [total, students] = await Promise.all([
+            User.countDocuments(userQuery),
+            User.find(userQuery)
+                .select("name studentId email phone username course createdAt")
+                .sort({ name: 1, _id: 1 })
+                .skip((safePage - 1) * safeLimit)
+                .limit(safeLimit)
+                .lean(),
+        ]);
+
+        const activeStudentIds = students.length
+            ? await Payment.distinct("userId", {
+                userId: { $in: students.map((student) => student._id) },
+                status: "paid",
+                startDate: { $lte: now },
+                endDate: { $gte: now },
+            })
+            : [];
+        const activeSet = new Set(activeStudentIds.map((id) => id.toString()));
+
+        return {
+            data: students.map((student) => ({
+                ...student,
+                status: activeSet.has(student._id.toString()) ? "active" : "inactive",
+            })),
+            pagination: {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                pages: Math.ceil(total / safeLimit),
+            },
+        };
+    }
+
+    async getTransactions({ search = "", status = "", fromDate, toDate, page = 1, limit = 10 }, Payment, User) {
+        const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
+        const safeLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 10));
+        const query = {};
+        const allowedStatuses = ["pending", "paid", "completed", "failed"];
+        if (allowedStatuses.includes(status)) query.status = status;
+
+        if (fromDate || toDate) {
+            query.createdAt = {};
+            if (fromDate) {
+                const start = new Date(fromDate);
+                if (Number.isNaN(start.getTime())) throw new Error("fromDate must be a valid date");
+                start.setHours(0, 0, 0, 0);
+                query.createdAt.$gte = start;
+            }
+            if (toDate) {
+                const end = new Date(toDate);
+                if (Number.isNaN(end.getTime())) throw new Error("toDate must be a valid date");
+                end.setHours(23, 59, 59, 999);
+                query.createdAt.$lte = end;
+            }
+        }
+
+        const keyword = typeof search === "string" ? search.trim() : "";
+        if (keyword) {
+            const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const matchedStudents = await User.find({
+                $or: [
+                    { name: { $regex: escapedKeyword, $options: "i" } },
+                    { studentId: { $regex: escapedKeyword, $options: "i" } },
+                    { email: { $regex: escapedKeyword, $options: "i" } },
+                    { phone: { $regex: escapedKeyword, $options: "i" } },
+                ],
+            }).distinct("_id");
+            query.userId = { $in: matchedStudents };
+        }
+
+        const [total, transactions] = await Promise.all([
+            Payment.countDocuments(query),
+            Payment.find(query)
+                .select("userId mealType numberOfMeals totalAmount status paymentDate paidAt createdAt startDate endDate razorpayOrderId razorpayPaymentId")
+                .populate("userId", "name studentId email phone")
+                .sort({ createdAt: -1, _id: -1 })
+                .skip((safePage - 1) * safeLimit)
+                .limit(safeLimit)
+                .lean(),
+        ]);
+
+        return {
+            data: transactions,
+            pagination: {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                pages: Math.ceil(total / safeLimit),
+            },
+        };
+    }
+
+    async getReports({ fromDate, toDate }, Payment, MealUsage, User, MealExtension) {
+        const start = fromDate ? new Date(fromDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const end = toDate ? new Date(toDate) : new Date();
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+            throw new Error("A valid date range is required");
+        }
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
+        const paymentMatch = { createdAt: { $gte: start, $lte: end } };
+        const mealMatch = { mealDate: { $gte: start, $lte: end } };
+        const [paymentSummary, paymentTransactions, mealsByType, students, pendingExtensions] = await Promise.all([
+            Payment.aggregate([
+                { $match: paymentMatch },
+                {
+                    $group: {
+                        _id: null,
+                        transactionCount: { $sum: 1 },
+                        paidCount: { $sum: { $cond: [{ $in: ["$status", ["paid", "completed"]] }, 1, 0] } },
+                        pendingCount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+                        revenue: { $sum: { $cond: [{ $in: ["$status", ["paid", "completed"]] }, "$totalAmount", 0] } },
+                    },
+                },
+            ]),
+            Payment.find(paymentMatch)
+                .select("userId mealType numberOfMeals totalAmount status paymentDate createdAt paidAt")
+                .populate("userId", "name studentId email")
+                .sort({ createdAt: -1 })
+                .lean(),
+            MealUsage.aggregate([
+                { $match: mealMatch },
+                {
+                    $group: {
+                        _id: "$mealType",
+                        records: { $sum: 1 },
+                        consumed: { $sum: { $cond: ["$used", 1, 0] } },
+                        entitled: { $sum: { $cond: ["$entitled", 1, 0] } },
+                    },
+                },
+                { $sort: { _id: 1 } },
+            ]),
+            User.countDocuments({ role: { $in: ["student", "user"] }, createdAt: { $lte: end } }),
+            MealExtension.countDocuments({ status: "pending", createdAt: { $gte: start, $lte: end } }),
+        ]);
+
+        return {
+            fromDate: start,
+            toDate: end,
+            payments: paymentSummary[0] || {
+                transactionCount: 0,
+                paidCount: 0,
+                pendingCount: 0,
+                revenue: 0,
+            },
+            paymentTransactions,
+            mealsByType,
+            students,
+            pendingExtensions,
+        };
+    }
 
     // Fetch today's overviews
     async getTodayOverviews(Payment,user_model,Meal_Usage){
@@ -8,7 +187,7 @@ class AdminDashboardService {
         const startOfTomorrow = new Date(today);
         startOfTomorrow.setDate(today.getDate() + 1);
         startOfTomorrow.setHours(0, 0, 0, 0);
-        const regesteredStudent = await user_model.countDocuments({ role: "student" });
+        const regesteredStudent = await user_model.countDocuments({ role: { $in: ["student", "user"] } });
         const result = await Payment.aggregate([
                 {
                     $match: {
@@ -33,7 +212,7 @@ class AdminDashboardService {
         const paidStudent = result[0]?.totalPaidStudents || 0;
         const studentsWithoutActivePlan = regesteredStudent - paidStudent;
         const mealUsageCount = await Meal_Usage.countDocuments({ mealDate: today, used: true });
-        const totalRevenue = await Payment.aggregate([
+        const revenueResult = await Payment.aggregate([
             {
                 $match: {
                     status: "paid",
@@ -47,14 +226,15 @@ class AdminDashboardService {
                 $group: {
                     _id: null,
                     totalRevenue: {
-                    $sum: "$amount"
+                    $sum: "$totalAmount"
                     }
                 }
             }
         ]);
         
 
-        return { regesteredStudent, paidStudent, studentsWithoutActivePlan, mealUsageCount, totalRevenue };    
+        const totalRevenue = revenueResult[0]?.totalRevenue || 0;
+        return { regesteredStudent, paidStudent, studentsWithoutActivePlan, mealUsageCount, totalRevenue };
     }
 
 
@@ -127,7 +307,7 @@ class AdminDashboardService {
                 $group: {
                     _id: null,
                     totalPayments: { $sum: 1 },
-                    totalRevenue: { $sum: "$amount" },
+                    totalRevenue: { $sum: "$totalAmount" },
                 },
             },
         ]);
@@ -313,7 +493,5 @@ class AdminDashboardService {
 }
 
 export default new AdminDashboardService();
-
-
 
 

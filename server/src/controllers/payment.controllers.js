@@ -15,8 +15,15 @@ export const createOrderController = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      payment,
-      order
+      payment: {
+        _id: payment._id,
+        mealType: payment.mealType,
+        numberOfMeals: payment.numberOfMeals,
+        totalAmount: payment.totalAmount,
+        status: payment.status,
+      },
+      order,
+      keyId: process.env.RAZORPAY_KEY_ID
     });
   } catch (error) {
     return res.status(400).json({
@@ -38,12 +45,20 @@ export const verifyPaymentController = async (req, res) => {
 
     const payment = await PaymentService.verifyRazorpayPayment(
       { razorpay_order_id, razorpay_payment_id, razorpay_signature },
-      paymentId
+      paymentId,
+      req.user._id
     );
 
     return res.status(200).json({
       success: true,
-      payment
+      payment: {
+        _id: payment._id,
+        mealType: payment.mealType,
+        numberOfMeals: payment.numberOfMeals,
+        totalAmount: payment.totalAmount,
+        status: payment.status,
+        paidAt: payment.paidAt,
+      }
     });
   } catch (error) {
     return res.status(400).json({
@@ -53,7 +68,17 @@ export const verifyPaymentController = async (req, res) => {
   }
 };
 
+export const getPaymentHistoryController = async (req, res) => {
+  try {
+    const payments = await PaymentService.getPaymentHistory(req.user._id);
+    return res.status(200).json({ success: true, payments });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export default{
   createOrderController,
-  verifyPaymentController
+  verifyPaymentController,
+  getPaymentHistoryController
 }
